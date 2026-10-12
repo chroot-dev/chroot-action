@@ -9,7 +9,7 @@ permissions: {}
 jobs:
   major-tag:
     if: ${{ !github.event.release.prerelease }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     env:
