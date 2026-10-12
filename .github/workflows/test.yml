@@ -1,0 +1,59 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * 1'
+
+permissions: {}
+
+concurrency:
+  group: test
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: chroot
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: vm
+        # TODO: use $/ once actionlint accepts the self-repository syntax.
+        uses: ./ # zizmor: ignore[self-repository]
+        with:
+          ssh-key: ${{ secrets.CHROOT_SSH_KEY }}
+          sync: both
+          env: GREETING
+
+      - name: runs on OpenBSD with the workspace
+        shell: chroot {0}
+        env:
+          GREETING: it's me
+        run: |
+          test "$(uname)" = OpenBSD
+          test -f action.yml
+          test "$GREETING" = "it's me"
+          test "$PWD" = "$CHROOT_WORKSPACE"
+          uname -a > uname.txt
+
+      - name: brings files back
+        run: grep OpenBSD uname.txt
+
+      - id: fail
+        name: keeps the exit status
+        continue-on-error: true
+        shell: chroot {0}
+        run: exit 3
+
+      - name: failed step was reported
+        env:
+          OUTCOME: ${{ steps.fail.outcome }}
+        run: test "$OUTCOME" = failure

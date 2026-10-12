@@ -1,0 +1,49 @@
+#!/bin/sh
+# Used as `shell: chroot {0}`: runs the step's script on the Job VM.
+
+set -euf
+
+dir=${RUNNER_TEMP:?}/chroot-action
+script=${1:?usage: chroot script}
+
+if [ ! -f "$dir/ssh_config" ]; then
+	echo "::error::no Job VM in this job; run chroot-dev/chroot-action first"
+	exit 1
+fi
+read -r sync <"$dir/sync"
+read -r names <"$dir/env" || true
+
+vmssh="ssh -F $dir/ssh_config"
+rsync="rsync -a --timeout=300 --rsync-path=openrsync -e"
+
+if [ "$sync" != none ]; then
+	$rsync "$vmssh" --delete "${GITHUB_WORKSPACE:?}/" vm:work/
+fi
+
+quote() {
+	printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+step=$dir/step
+{
+	echo "export CI=true CHROOT_WORKSPACE=\$HOME/work"
+	for name in $(env | sed -n 's/^\(GITHUB_[A-Za-z0-9_]*\)=.*/\1/p') $names; do
+		value=$(printenv "$name") || continue
+		echo "export $name=$(quote "$value")"
+	done
+	echo "cd \"\$CHROOT_WORKSPACE\""
+	cat "$script"
+} >"$step"
+
+# The script travels as a file: fed on stdin, the first command in it
+# that reads stdin would swallow the rest of the script.
+$vmssh vm 'cat >.chroot-step' <"$step"
+rc=0
+$vmssh vm 'sh -e -o pipefail .chroot-step' </dev/null || rc=$?
+
+# FIX: pull with tar, not rsync: the guest's openrsync waits forever for
+# a final message the GNU rsync receiver never sends.
+if [ "$sync" = both ]; then
+	$vmssh vm 'cd work && tar cf - .' </dev/null | tar xf - -C "$GITHUB_WORKSPACE"
+fi
+exit "$rc"

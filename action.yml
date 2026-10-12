@@ -1,0 +1,45 @@
+name: chroot.dev OpenBSD VM
+description: Run the steps of a job on an OpenBSD VM from chroot.dev.
+author: Murilo Ijanc
+
+branding:
+  icon: terminal
+  color: yellow
+
+inputs:
+  ssh-key:
+    description: Private Ed25519 key of the chroot.dev account, from a secret.
+    required: true
+  image:
+    description: Image the VM starts from. Not used with from.
+    default: base
+  from:
+    description: Template VM to copy instead of creating a new one.
+    default: ''
+  setup:
+    description: Script run once as puffy on the first boot. Not used with from.
+    default: ''
+  cpus:
+    description: Number of cpus.
+    default: ''
+  memory:
+    description: Memory in MiB, or with an M or G suffix.
+    default: ''
+  disk:
+    description: Size of the data disk in GiB, or with a G or T suffix.
+    default: ''
+  sync:
+    description: Workspace sync around each step, one of in, both or none.
+    default: in
+  env:
+    description: Names of runner variables to pass to each step, besides CI and GITHUB_*.
+    default: ''
+
+outputs:
+  vm-name:
+    description: Name of the Job VM.
+
+runs:
+  using: node24
+  main: src/main.js
+  post: src/post.js
