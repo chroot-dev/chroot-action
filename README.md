@@ -25,15 +25,26 @@ jobs:
 ## Key
 
 You need a [chroot.dev account](https://chroot.dev/man/account/). Give CI
-a key of its own:
+a key of its own, restricted with `--ci`:
 
     ssh-keygen -t ed25519 -N '' -C ci -f chroot-ci
-    ssh chroot.dev ssh-key add < chroot-ci.pub
+    ssh chroot.dev ssh-key add --ci --from ci-go < chroot-ci.pub
     echo NONCE | ssh-keygen -Y sign -n add-key@chroot.dev -f chroot-ci |
         ssh chroot.dev ssh-key add
     gh secret set CHROOT_SSH_KEY < chroot-ci
 
-`NONCE` is the challenge the first `ssh-key add` prints.
+`NONCE` is the challenge the first `ssh-key add` prints. Give `--from`
+once for each [template](#templates) used with `from:`, or leave it out.
+
+The key can only create VMs, copy those templates, and reach, inspect and
+remove the VMs it created. Nothing else of the account is open to it.
+
+A key's restriction cannot be changed. To restrict an existing CI key, or
+to change its templates, add a new key with `--ci`, update the secret,
+then remove the old key by the fingerprint `ssh chroot.dev ssh-key ls`
+shows. Removing a key from the account does not remove it from the
+`authorized_keys` of VMs created while it was there, nor of their copies:
+make the templates again once the old key is gone.
 
 Secrets are not available to pull requests from forks, so the action fails
 there. Do not work around it with `pull_request_target`: it would run
