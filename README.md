@@ -64,6 +64,10 @@ untrusted code with your key.
 | `sync` | `in` | `in`, `both` or `none`. |
 | `env` | | Runner variables to pass to each step. |
 
+Values other than `ssh-key`, `setup` and `env` are one line of ASCII: a
+newline or other control character fails the step. `env` takes names
+separated by spaces, tabs or newlines.
+
 The output `vm-name` is the name of the VM.
 
 ## Steps on the VM
@@ -73,8 +77,16 @@ A step with `shell: chroot {0}` runs as `puffy`, who has `doas`, with
 there; with `sync: both`, `~/work` is also copied back after it, even if
 the step failed.
 
-The step sees `CI=true`, `CHROOT_WORKSPACE`, the `GITHUB_*` variables and
-those named in `env`:
+What comes back is output of the VM: a later step that runs it, or a
+local `uses: ./...` action in the workspace, runs the VM's code. `.git`
+does not come back, so commits and tags made on the VM stay there.
+Symlinks that are absolute or whose `..` may lead out of `~/work` are
+dropped with a warning, and setuid and setgid bits are cleared on files.
+
+The step sees `CI=true`, `CHROOT_WORKSPACE`, the `GITHUB_*` variables
+except the file-command paths (`GITHUB_ENV`, `GITHUB_PATH`,
+`GITHUB_OUTPUT`, `GITHUB_STATE`, `GITHUB_STEP_SUMMARY`), and those named
+in `env`:
 
 ```yaml
       - uses: chroot-dev/chroot-action@v1
@@ -109,7 +121,10 @@ for each job; the copy resumes in a fraction of a second:
 
 - Linux runners only.
 - Each job's VM counts against the account's plan.
-- `sync: both` copies all of `~/work` back after every step.
+- `sync: both` copies all of `~/work` back after every step, without
+  `.git` and unsafe symlinks. Those files are output of the VM: a later
+  step that runs them, or a local `uses: ./...` action, runs the VM's
+  code.
 
 ## License
 

@@ -1,15 +1,23 @@
 #!/bin/sh
 
 set -euf
+LC_ALL=C
+export LC_ALL
 
+# printf: dash's echo turns a \n in a value into a new workflow command.
 die() {
-	echo "::error::$*"
+	printf '::error::%s\n' "$*"
 	exit 1
 }
 
 check() {
 	value=$1 pattern=$2 input=$3
 	[ -z "$value" ] && return
+	case $value in
+	*[![:print:]]*)
+		die "$input: invalid value: it holds a control or non-ASCII character"
+		;;
+	esac
 	printf '%s\n' "$value" | grep -Eqx "$pattern" ||
 		die "$input: invalid value '$value'"
 }
@@ -26,8 +34,10 @@ check "$INPUT_CPUS" '[0-9]+' cpus
 check "$INPUT_MEMORY" '[0-9]+[MG]?' memory
 check "$INPUT_DISK" '[0-9]+[GT]?' disk
 check "$INPUT_SYNC" 'in|both|none' sync
+names=
 for name in $INPUT_ENV; do
 	check "$name" '[A-Za-z_][A-Za-z0-9_]*' env
+	names=${names:+$names }$name
 done
 if [ -n "$INPUT_FROM" ] && [ -n "$INPUT_SETUP" ]; then
 	die "setup does not apply with from: the template is already set up"
@@ -36,7 +46,7 @@ fi
 [ -d "$dir" ] && die "chroot-action already ran in this job"
 mkdir -m 700 "$dir"
 printf '%s\n' "$INPUT_SYNC" >"$dir/sync"
-printf '%s\n' "$INPUT_ENV" >"$dir/env"
+printf '%s\n' "$names" >"$dir/env"
 
 # ssh refuses a key that lost its final newline or kept CRLFs from a paste.
 umask 077

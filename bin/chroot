@@ -4,6 +4,7 @@
 set -euf
 
 dir=${RUNNER_TEMP:?}/chroot-action
+src=$(cd "$(dirname "$0")/../src" && pwd)
 script=${1:?usage: chroot script}
 
 if [ ! -f "$dir/ssh_config" ]; then
@@ -28,6 +29,12 @@ step=$dir/step
 {
 	echo "export CI=true CHROOT_WORKSPACE=\$HOME/work"
 	for name in $(env | sed -n 's/^\(GITHUB_[A-Za-z0-9_]*\)=.*/\1/p') $names; do
+		# Runner paths the guest must not learn.
+		case $name in
+		GITHUB_ENV | GITHUB_PATH | GITHUB_OUTPUT | GITHUB_STATE | GITHUB_STEP_SUMMARY)
+			continue
+			;;
+		esac
 		value=$(printenv "$name") || continue
 		echo "export $name=$(quote "$value")"
 	done
@@ -41,9 +48,31 @@ $vmssh vm 'cat >.chroot-step' <"$step"
 rc=0
 $vmssh vm 'sh -e -o pipefail .chroot-step' </dev/null || rc=$?
 
+# Extract into a fresh dir, then rsync: it replaces a symlink in its way
+# instead of writing through it. .git stays out: its hooks and config
+# would run on the Runner.
 # FIX: pull with tar, not rsync: the guest's openrsync waits forever for
 # a final message the GNU rsync receiver never sends.
+pull() {
+	mkdir "$tmp/work" &&
+		{ $vmssh vm 'cd work && tar cf - .' </dev/null || : >"$tmp/failed"; } |
+		tar xf - --no-same-owner --no-same-permissions -C "$tmp/work" &&
+		[ ! -e "$tmp/failed" ] &&
+		find "$tmp/work" -name .git -prune -o -type l \
+			-exec sh "$src/drop-unsafe-links.sh" "$tmp/work" {} + &&
+		chmod --reference="$GITHUB_WORKSPACE" "$tmp/work" &&
+		rsync -rlpt --safe-links --exclude=.git --chmod=Fug-s \
+			"$tmp/work/" "$GITHUB_WORKSPACE/"
+}
+
 if [ "$sync" = both ]; then
-	$vmssh vm 'cd work && tar cf - .' </dev/null | tar xf - -C "$GITHUB_WORKSPACE"
+	tmp=
+	if ! tmp=$(mktemp -d "$RUNNER_TEMP/chroot-pull.XXXXXX") || ! pull; then
+		echo "::error::could not copy ~/work back from the Job VM"
+		[ "$rc" -ne 0 ] || rc=1
+	fi
+	if [ -n "$tmp" ] && ! { chmod -R u+rwX "$tmp" && rm -rf "$tmp"; }; then
+		echo "::warning::could not remove $tmp"
+	fi
 fi
 exit "$rc"
