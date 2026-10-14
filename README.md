@@ -58,11 +58,17 @@ untrusted code with your key.
 | `image` | `base` | Image the VM starts from. |
 | `from` | | VM to copy instead of creating one. |
 | `setup` | | Script run once on the first boot. |
-| `cpus` | | Number of cpus. |
-| `memory` | | Memory in MiB, or with an `M` or `G` suffix. |
+| `cpus` | `1` | Number of cpus. |
+| `memory` | `512M` | Memory in MiB, or with an `M` or `G` suffix. |
 | `disk` | | Data disk in GiB, or with a `G` or `T` suffix. |
 | `sync` | `in` | `in`, `both` or `none`. |
 | `env` | | Runner variables to pass to each step. |
+
+The `cpus` and `memory` defaults apply to a new VM: with `from:`, the
+copy keeps the template's size unless they are given. A VM made with
+`new` and no sizes would get 128 MiB, where most builds swap; 1 cpu and
+512 MiB still fit the trial. Builds that compile a lot, like Go's
+standard library, want 2 cpus and 1 GiB.
 
 Values other than `ssh-key`, `setup` and `env` are one line of ASCII: a
 newline or other control character fails the step. `env` takes names

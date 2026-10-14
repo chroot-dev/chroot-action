@@ -77,6 +77,12 @@ EOF
 echo "vm=$vm" >>"$GITHUB_STATE"
 echo "vm-name=$vm" >>"$GITHUB_OUTPUT"
 
+# new without sizes gets the server's 128 MiB, where most builds swap;
+# 1 cpu and 512 MiB still fit the trial. A copy keeps its template's.
+if [ -z "$INPUT_FROM" ]; then
+	: "${INPUT_CPUS:=1}" "${INPUT_MEMORY:=512M}"
+fi
+
 set -- -w
 [ -n "$INPUT_CPUS" ] && set -- "$@" -c "$INPUT_CPUS"
 [ -n "$INPUT_MEMORY" ] && set -- "$@" -m "$INPUT_MEMORY"

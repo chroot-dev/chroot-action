@@ -215,6 +215,12 @@ case4() {
 <-F><$cfg><vm><mkdir><-p><work>"
 	expect 'new: no bin in GITHUB_PATH' is "$r/path" "$root/bin"
 
+	setup INPUT_FROM=tmpl
+	accepted 'cp without sizes'
+	expect 'cp without sizes: wrong ssh calls' is "$r/ssh/calls" \
+		"<-F><$cfg><chroot.dev><cp><-w><tmpl><$vm>
+<-F><$cfg><vm><mkdir><-p><work>"
+
 	setup INPUT_FROM=tmpl INPUT_CPUS=1
 	accepted cp
 	expect 'cp: wrong ssh calls' is "$r/ssh/calls" \
@@ -229,7 +235,7 @@ exit 0
 	setup "INPUT_SETUP=$script"
 	accepted setup
 	expect 'setup: wrong ssh calls' is "$r/ssh/calls" \
-		"<-F><$cfg><chroot.dev><new><-w><-i><base><-n><$vm><-s></dev/stdin>
+		"<-F><$cfg><chroot.dev><new><-w><-c><1><-m><512M><-i><base><-n><$vm><-s></dev/stdin>
 <-F><$cfg><vm><mkdir><-p><work>"
 	expect 'setup: script changed on stdin' is "$r/ssh/stdin" "$script"
 

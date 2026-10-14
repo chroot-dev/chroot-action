@@ -20,10 +20,10 @@ inputs:
     description: Script run once as puffy on the first boot. Not used with from.
     default: ''
   cpus:
-    description: Number of cpus.
+    description: Number of cpus. A new VM gets 1 by default; a copy keeps the template's.
     default: ''
   memory:
-    description: Memory in MiB, or with an M or G suffix.
+    description: Memory in MiB, or with an M or G suffix. A new VM gets 512M by default; a copy keeps the template's.
     default: ''
   disk:
     description: Size of the data disk in GiB, or with a G or T suffix.
